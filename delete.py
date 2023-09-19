@@ -7,7 +7,7 @@ print(boto3.__version__)
 account_id = '476494407737'
 aws_region = 'us-west-2'
 event = 'Update'
-CONFIG_RECORDER_EXCLUSION_RESOURCE_STRING = 'AWS::HealthLake::FHIRDatastore,AWS::Pinpoint::Segment,AWS::Pinpoint::ApplicationSettings'
+CONFIG_RECORDER_INCLUSION_RESOURCE_STRING = 'AWS::HealthLake::FHIRDatastore,AWS::Pinpoint::Segment,AWS::Pinpoint::ApplicationSettings'
 
 STS = boto3.client("sts")
 
@@ -48,7 +48,7 @@ print(f'Existing Configuration Recorder :', configrecorder)
 # ControlTower created configuration recorder with name "aws-controltower-BaselineConfigRecorder" update that
 role_arn = 'arn:aws:iam::' + account_id + ':role/aws-controltower-ConfigRecorderRole'
 
-CONFIG_RECORDER_EXCLUSION_RESOURCE_LIST = CONFIG_RECORDER_EXCLUSION_RESOURCE_STRING.split(',')
+CONFIG_RECORDER_INCLUSION_RESOURCE_LIST = CONFIG_RECORDER_INCLUSION_RESOURCE_STRING.split(',')
 
 # Event = Delete is when stack is deleted, we rollback changed made and leave it as ControlTower Intended
 if event == 'Delete':
@@ -70,12 +70,7 @@ else:
             'recordingGroup': {
                 'allSupported': False,
                 'includeGlobalResourceTypes': False,
-                'exclusionByResourceTypes': {
-                    'resourceTypes': CONFIG_RECORDER_EXCLUSION_RESOURCE_LIST
-                },
-                'recordingStrategy': {
-                    'useOnly': 'EXCLUSION_BY_RESOURCE_TYPES'
-                }
+                'resourceTypes': CONFIG_RECORDER_INCLUSION_RESOURCE_LIST
             }
         })
     print(f'Response for put_configuration_recorder :{response} ')
