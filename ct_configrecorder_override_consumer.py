@@ -67,8 +67,8 @@ def lambda_handler(event, context):
         try:
             role_arn = 'arn:aws:iam::' + account_id + ':role/aws-controltower-ConfigRecorderRole'
 
-            CONFIG_RECORDER_EXCLUSION_RESOURCE_STRING = os.getenv('CONFIG_RECORDER_EXCLUDED_RESOURCE_LIST')
-            CONFIG_RECORDER_EXCLUSION_RESOURCE_LIST = CONFIG_RECORDER_EXCLUSION_RESOURCE_STRING.split(',')
+            CONFIG_RECORDER_INCLUSION_RESOURCE_STRING = os.getenv('CONFIG_RECORDER_INCLUDED_RESOURCE_LIST')
+            CONFIG_RECORDER_INCLUSION_RESOURCE_LIST = CONFIG_RECORDER_INCLUSION_RESOURCE_STRING.split(',')
 
             # Event = Delete is when stack is deleted, we rollback changed made and leave it as ControlTower Intended
             if event == 'Delete':
@@ -91,12 +91,7 @@ def lambda_handler(event, context):
                         'recordingGroup': {
                             'allSupported': False,
                             'includeGlobalResourceTypes': False,
-                            'exclusionByResourceTypes': {
-                                'resourceTypes': CONFIG_RECORDER_EXCLUSION_RESOURCE_LIST
-                            },
-                            'recordingStrategy': {
-                                'useOnly': 'EXCLUSION_BY_RESOURCE_TYPES'
-                            }
+                            'resourceTypes': CONFIG_RECORDER_INCLUSION_RESOURCE_LIST
                         }
                     })
                 logging.info(f'Response for put_configuration_recorder :{response} ')

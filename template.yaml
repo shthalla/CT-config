@@ -3,15 +3,15 @@ Description: 'AWS CloudFormation Template to update config recorder settings in 
 Parameters:
 
   ExcludedAccounts:
-    Description: Excluded Accounts list. This list should contain Management account, Log Archive and Audit accounts at the minimum
-    Default: "['111111111111', '222222222222', '333333333333']"
+    Description: This list should contain Management account, Log Archive and Audit accounts at the minimum
+    Default: "['811538682820', '866232342806', '521968430494']"
     MaxLength: '2000'
     MinLength: '36'
     Type: String
 
-  ConfigRecorderExcludedResourceTypes:
-    Description: List of all resource types to be excluded from Config Recorder
-    Default: "AWS::HealthLake::FHIRDatastore,AWS::Pinpoint::Segment,AWS::Pinpoint::ApplicationSettings"
+  ConfigRecorderIncludedResourceTypes:
+    Description: List of all resource types to be included from Config Recorder
+    Default: "AWS::ACM::Certificate,AWS::ApiGateway::RestApi,AWS::ApiGateway::Stage,AWS::ApiGatewayV2::Api,AWS::ApiGatewayV2::Stage,AWS::AutoScaling::AutoScalingGroup,AWS::AutoScaling::LaunchConfiguration,AWS::AutoScaling::ScalingPolicy,AWS::AutoScaling::ScheduledAction,AWS::CloudFormation::Stack,AWS::CloudTrail::Trail,AWS::CloudWatch::Alarm,AWS::CodeBuild::Project,AWS::CodePipeline::Pipeline,AWS::Config::ResourceCompliance,AWS::DynamoDB::Table,AWS::EC2::CustomerGateway,AWS::EC2::EgressOnlyInternetGateway,AWS::EC2::EIP,AWS::EC2::FlowLog,AWS::EC2::Host,AWS::EC2::Instance,AWS::EC2::InternetGateway,AWS::EC2::NatGateway,AWS::EC2::NetworkAcl,AWS::EC2::NetworkInterface,AWS::EC2::RegisteredHAInstance,AWS::EC2::RouteTable,AWS::EC2::SecurityGroup,AWS::EC2::Subnet,AWS::EC2::VPC,AWS::EC2::VPCEndpoint,AWS::EC2::VPCEndpointService,AWS::EC2::VPCPeeringConnection,AWS::EC2::VPNConnection,AWS::EC2::VPNGateway,AWS::ElasticBeanstalk::Application,AWS::ElasticBeanstalk::ApplicationVersion,AWS::ElasticBeanstalk::Environment,AWS::ElasticLoadBalancing::LoadBalancer,AWS::ElasticLoadBalancingV2::LoadBalancer,AWS::Elasticsearch::Domain,AWS::KMS::Key,AWS::Lambda::Function,AWS::RDS::DBInstance,AWS::RDS::DBSecurityGroup,AWS::RDS::DBSnapshot,AWS::RDS::DBSubnetGroup,AWS::RDS::EventSubscription,AWS::SecretsManager::Secret,AWS::ServiceCatalog::CloudFormationProduct,AWS::ServiceCatalog::CloudFormationProvisionedProduct,AWS::ServiceCatalog::Portfolio,AWS::ShieldRegional::Protection,AWS::SNS::Topic,AWS::SQS::Queue,AWS::SSM::AssociationCompliance,AWS::SSM::ManagedInstanceInventory,AWS::SSM::PatchCompliance,AWS::WAFRegional::RateBasedRule,AWS::WAFRegional::Rule,AWS::WAFRegional::RuleGroup,AWS::WAFRegional::WebACL,AWS::WAFv2::IPSet,AWS::WAFv2::ManagedRuleSet,AWS::WAFv2::RegexPatternSet,AWS::WAFv2::RuleGroup,AWS::WAFv2::WebACL,AWS::XRay::EncryptionConfig"
     Type: String
 
   CloudFormationVersion:
@@ -34,7 +34,7 @@ Resources:
             #FunctionName: ct_configrecorder_override_producer_cf
             Code:
                 S3Bucket: !Ref LambdaZipsBucket
-                S3Key: ct-blogs-content/ct_configrecorder_override_producer.zip
+                S3Key: ct-config-content/ct_configrecorder_override_producer.zip
             Handler: ct_configrecorder_override_producer.lambda_handler
             Role: !GetAtt ProducerLambdaExecutionRole.Arn
             Runtime: python3.10
@@ -65,7 +65,7 @@ Resources:
             #FunctionName: ct_configrecorder_override_consumer_cf
             Code:
                 S3Bucket: !Ref LambdaZipsBucket
-                S3Key: ct-blogs-content/ct_configrecorder_override_consumer_v2.zip
+                S3Key: ct-config-content/ct_configrecorder_override_consumer.zip
             Handler: ct_configrecorder_override_consumer.lambda_handler
             Role: !GetAtt ConsumerLambdaExecutionRole.Arn
             Runtime: python3.10
@@ -77,7 +77,7 @@ Resources:
             Environment:
                 Variables:
                     LOG_LEVEL: INFO
-                    CONFIG_RECORDER_EXCLUDED_RESOURCE_LIST: !Ref ConfigRecorderExcludedResourceTypes
+                    CONFIG_RECORDER_INCLUDED_RESOURCE_LIST: !Ref ConfigRecorderIncludedResourceTypes
 
     ConsumerLambdaEventSourceMapping:
         Type: AWS::Lambda::EventSourceMapping
@@ -198,13 +198,13 @@ Resources:
         ServiceToken: !GetAtt 'CopyZipsFunction.Arn'
         DestBucket: !Ref 'LambdaZipsBucket'
         #update this to match AWS public bucket
-        #s3://marketplace-sa-resources/ct-blogs-content/ct_configrecorder_override_consumer_v2.zip
-        #s3://marketplace-sa-resources/ct-blogs-content/ct_configrecorder_override_producer.zip
-        SourceBucket: marketplace-sa-resources
-        Prefix: ct-blogs-content/
+        #s3://control-tower-config-recorder-customization/ct-config-content/ct_configrecorder_override_consumer.zip
+        #s3://control-tower-config-recorder-customization/ct-config-content/ct_configrecorder_override_producer.zip
+        SourceBucket: control-tower-config-recorder-customization
+        Prefix: ct-config-content/
         Objects:
           - 'ct_configrecorder_override_producer.zip'
-          - 'ct_configrecorder_override_consumer_v2.zip'
+          - 'ct_configrecorder_override_consumer.zip'
 
     CopyZipsRole:
       Type: AWS::IAM::Role
@@ -229,14 +229,14 @@ Resources:
                     - s3:GetObject
                     - s3:GetObjectTagging
                   Resource:
-                    - !Sub 'arn:${AWS::Partition}:s3:::marketplace-sa-resources/ct-blogs-content/*'
+                    - !Sub 'arn:${AWS::Partition}:s3:::control-tower-config-recorder-customization/ct-config-content/*'
                 - Effect: Allow
                   Action:
                     - s3:PutObject
                     - s3:DeleteObject
                     - s3:PutObjectTagging
                   Resource:
-                    - !Sub 'arn:${AWS::Partition}:s3:::${LambdaZipsBucket}/ct-blogs-content/*'
+                    - !Sub 'arn:${AWS::Partition}:s3:::${LambdaZipsBucket}/ct-config-content/*'
 
     CopyZipsFunction:
       Type: AWS::Lambda::Function
