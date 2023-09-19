@@ -9,8 +9,8 @@ Parameters:
     MinLength: '36'
     Type: String
 
-  ConfigRecorderExcludedResourceTypes:
-    Description: List of all resource types to be excluded from Config Recorder
+  ConfigRecorderIncludedResourceTypes:
+    Description: List of all resource types to be included from Config Recorder
     Default: "AWS::HealthLake::FHIRDatastore,AWS::Pinpoint::Segment,AWS::Pinpoint::ApplicationSettings"
     Type: String
 
@@ -77,7 +77,7 @@ Resources:
             Environment:
                 Variables:
                     LOG_LEVEL: INFO
-                    CONFIG_RECORDER_EXCLUDED_RESOURCE_LIST: !Ref ConfigRecorderExcludedResourceTypes
+                    CONFIG_RECORDER_INCLUDED_RESOURCE_LIST: !Ref ConfigRecorderIncludedResourceTypes
 
     ConsumerLambdaEventSourceMapping:
         Type: AWS::Lambda::EventSourceMapping
