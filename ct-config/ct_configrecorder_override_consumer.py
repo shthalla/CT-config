@@ -5,12 +5,10 @@ import botocore.exceptions
 import os
 
 def lambda_handler(event, context):
-
     LOG_LEVEL = os.getenv('LOG_LEVEL')
     logging.getLogger().setLevel(LOG_LEVEL)
 
     try:
-
         logging.info('Event Body:')
 
         body = json.loads(event['Records'][0]['body'])
@@ -104,6 +102,35 @@ def lambda_handler(event, context):
             configrecorder = configservice.describe_configuration_recorders()
             logging.info(f'Exception : {configrecorder}')
             raise exe
+
+        # # Create and configure the AWS managed rules
+        # def create_config_rule(configservice, rule_name, resource_types):
+        #     try:
+        #         response = configservice.put_config_rule(
+        #             ConfigRule={
+        #                 'ConfigRuleName': rule_name,
+        #                 'Scope': {
+        #                     'ComplianceResourceTypes': resource_types,
+        #                 },
+        #                 'Source': {
+        #                     'Owner': 'AWS',
+        #                     'SourceIdentifier': rule_name,
+        #                 },
+        #             }
+        #         )
+        #         logging.info(f'Response for {rule_name} rule creation: {response}')
+        #     except botocore.exceptions.ClientError as exe:
+        #         logging.error(f'Unable to create {rule_name} rule: {exe}')
+        #         raise exe
+
+        # # Create and configure the AWS managed rules
+        # create_config_rule(configservice, 's3-bucket-public-read-prohibited', ['AWS::S3::Bucket'])
+        # create_config_rule(configservice, 'guardduty-enabled-centralized', [])
+
+        # # Start evaluation of the rules (optional)
+        # config_rules_to_evaluate = ['s3-bucket-public-read-prohibited', 'guardduty-enabled-centralized']
+        # for rule_name in config_rules_to_evaluate:
+        #     configservice.start_config_rules_evaluation(ConfigRuleNames=[rule_name])
 
         return {
             'statusCode': 200
