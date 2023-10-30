@@ -6,7 +6,6 @@ import os
 
 def lambda_handler(event, context):
 
-
     LOG_LEVEL = os.getenv('LOG_LEVEL')
     logging.getLogger().setLevel(LOG_LEVEL)
 

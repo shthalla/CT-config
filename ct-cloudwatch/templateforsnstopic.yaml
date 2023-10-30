@@ -1,0 +1,80 @@
+#AWS CloudFormation Template to add subscription of SQS to the config recorders SNS Topic in the Audit account
+
+AWSTemplateFormatVersion: '2010-09-09'
+Description: CloudFormation template to create Lambda, EventBridge rule, and IAM role for monitoring SNS topic configuration changes.
+
+Resources:
+  SNSSubscriptionLambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: SNSSubscriptionLambdaExecutionRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Policies:
+        - PolicyName: SNSSubscriptionLambdaExecutionPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                  - sns:Subscribe
+                  - sns:ListSubscriptionsByTopic
+                Resource: '*'
+
+  SNSSubscriptionLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: SNSSubscriptionLambda
+      Handler: index.lambda_handler
+      Role: !GetAtt SNSSubscriptionLambdaExecutionRole.Arn
+      Code:
+        S3Bucket: ct-customization-donotdelete
+        S3Key: configrecorderssnssubscription.zip
+      Runtime: python3.8
+      Tags:  # Add tags here
+        - Key: POC
+          Value: cloudops-platform@ellucian.com
+        - Key: Service
+          Value: controltower-lambda
+
+  SNSSubscriptionEventRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: SNSSubscriptionEventRule
+      Description: Event rule to trigger SNSSubscriptionLambda for SNS configuration changes
+      EventPattern:
+        source:
+          - aws.sns
+        detail-type:
+          - AWS API Call via CloudTrail
+        detail:
+          eventSource:
+            - sns.amazonaws.com
+          eventName:
+            - SetTopicAttributes
+          requestParameters.topicArn:
+            - arn:aws:sns:us-east-1:866232342806:aws-controltower-AllConfigNotifications
+      Targets:
+        - Arn: !GetAtt SNSSubscriptionLambda.Arn
+          Id: SNSSubscriptionLambda
+
+Outputs:
+  LambdaFunctionArn:
+    Value: !GetAtt SNSSubscriptionLambda.Arn
+    Description: ARN of the Lambda function.
+  EventRuleArn:
+    Value: !GetAtt SNSSubscriptionEventRule.Arn
+    Description: ARN of the EventBridge rule.
+  LambdaExecutionRoleArn:
+    Value: !GetAtt SNSSubscriptionLambdaExecutionRole.Arn
+    Description: ARN of the Lambda execution role.

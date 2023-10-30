@@ -1,0 +1,194 @@
+#AWS CloudFormation Template to add the tags to the lambdas created by AWSControlTowerBP-BASELINE-CLOUDWATCH stack set. 
+
+Description: "AWS CloudFormation Template to add the tags to the lambdas created by AWSControlTowerBP-BASELINE-CLOUDWATCH stack set"
+Parameters:
+
+  ExcludedAccountsforTags:
+    Description: This list should contain Management account at the minimum as it doesnt contain the aws-controltower-NotificationForwarder lambda function to add. 
+    Default: "['811538682820']"
+    MaxLength: "2000"
+    MinLength: "8"
+    Type: String
+
+  CloudFormationVersion:
+    Type: String
+    Default: 2
+
+  LambdaZipsBucket:
+    Type: String
+    Default: "ct-customization-dontdelete"
+
+Resources:
+
+  ProducerLambda:
+    Type: AWS::Lambda::Function
+    DeletionPolicy: Retain
+    Properties:
+      #FunctionName: ct_cloudwatch_override_producer
+      Code:
+        S3Bucket: !Ref LambdaZipsBucket
+        S3Key: ct-cloudwatch/ct_cloudwatch_override_producer.zip
+      Handler: ct_cloudwatch_override_producer.lambda_handler
+      Role: !GetAtt ProducerLambdaExecutionRole.Arn
+      Runtime: python3.10
+      MemorySize: 128
+      Timeout: 300
+      Architectures:
+        - x86_64
+      ReservedConcurrentExecutions: 1
+      Environment:
+        Variables:
+          EXCLUDED_ACCOUNTS: !Ref ExcludedAccountsforTags
+          LOG_LEVEL: INFO
+          SQS_URL: !Ref SQSConfigRecorder
+      Tags:  # Add tags here
+        - Key: POC
+          Value: cloudops-platform@ellucian.com
+        - Key: Service
+          Value: controltower-lambda
+
+  ProducerLambdaPermissions:
+    Type: AWS::Lambda::Permission
+    DeletionPolicy: Retain
+    Properties:
+      Action: "lambda:InvokeFunction"
+      FunctionName: !Ref ProducerLambda
+      Principal: "events.amazonaws.com"
+      SourceArn: !GetAtt ProducerEventTrigger.Arn
+
+  ProducerLambdaExecutionRole:
+    Type: "AWS::IAM::Role"
+    DeletionPolicy: Retain
+    Properties:
+      ManagedPolicyArns:
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - "sts:AssumeRole"
+      Path: /
+      Policies:
+        - PolicyName: ct_cro_producer
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - cloudformation:ListStackInstances
+                Resource: !Sub "arn:${AWS::Partition}:cloudformation:*:*:stackset/AWSControlTowerBP-BASELINE-CLOUDWATCH:*"
+              - Effect: Allow
+                Action:
+                  - sqs:DeleteMessage
+                  - sqs:ReceiveMessage
+                  - sqs:SendMessage
+                  - sqs:GetQueueAttributes
+                Resource: !GetAtt SQSConfigRecorder.Arn
+
+  ProducerEventTrigger:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: "Rule to trigger config recorder override producer lambda"
+      EventBusName: default
+      EventPattern: '{
+        "source": ["aws.controltower"],
+        "detail-type": ["AWS Service Event via CloudTrail"],
+        "detail": {
+        "eventName": ["UpdateLandingZone", "CreateManagedAccount", "UpdateManagedAccount"]
+        }
+        }'
+      Name: !GetAtt SQSConfigRecorder.QueueName #ct_cloudwatch_addtags_cf
+      State: ENABLED
+      Targets:
+        - Arn:
+            Fn::GetAtt:
+              - "ProducerLambda"
+              - "Arn"
+          Id: "ProducerTarget"
+
+  ProducerLambdaTrigger:
+    Type: "Custom::ExecuteLambda"
+    Properties:
+      ServiceToken: !GetAtt "ProducerLambda.Arn"
+      FunctionName: !Ref ProducerLambda
+      Version: !Ref CloudFormationVersion
+
+  SQSConfigRecorder:
+    Type: AWS::SQS::Queue
+    DeletionPolicy: Retain
+    Properties:
+      #QueueName: ct_cloudwatch_addtags_cf
+      VisibilityTimeout: 180
+      DelaySeconds: 5
+      KmsMasterKeyId: alias/aws/sqs
+
+  ConsumerLambdaExecutionRole:
+    Type: "AWS::IAM::Role"
+    DeletionPolicy: Retain
+    Properties:
+      ManagedPolicyArns:
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - "sts:AssumeRole"
+      Path: /
+      Policies:
+        - PolicyName: policy-sts-all
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - sts:AssumeRole
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - sqs:DeleteMessage
+                  - sqs:ReceiveMessage
+                  - sqs:SendMessage
+                  - sqs:GetQueueAttributes
+                Resource: !GetAtt SQSConfigRecorder.Arn
+
+  ConsumerLambda:
+    Type: AWS::Lambda::Function
+    DeletionPolicy: Retain
+    Properties:
+      #FunctionName: ct_cloudwatch_override_consumer
+      Code:
+        S3Bucket: !Ref LambdaZipsBucket
+        S3Key: ct-cloudwatch/ct_cloudwatch_override_consumer.zip
+      Handler: ct_cloudwatch_override_consumer.lambda_handler
+      Role: !GetAtt ConsumerLambdaExecutionRole.Arn
+      Runtime: python3.10
+      MemorySize: 128
+      Timeout: 180
+      Architectures:
+        - x86_64
+      ReservedConcurrentExecutions: 10
+      Environment:
+        Variables:
+          LOG_LEVEL: INFO
+      Tags:  # Add tags here
+        - Key: POC
+          Value: cloudops-platform@ellucian.com
+        - Key: Service
+          Value: controltower-lambda
+
+  ConsumerLambdaEventSourceMapping:
+    Type: AWS::Lambda::EventSourceMapping
+    DeletionPolicy: Retain
+    Properties:
+      BatchSize: 1
+      Enabled: true
+      EventSourceArn: !GetAtt SQSConfigRecorder.Arn
+      FunctionName: !GetAtt ConsumerLambda.Arn
